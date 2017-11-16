@@ -41,6 +41,30 @@ For every state value provided by the simulator an optimal trajectory for the ne
 
 Before sending the result back to the simulator a 100ms latency delay was implemented. `this_thread::sleep_for(chrono::milliseconds(100)); `This replicated the actuation delay that would be experienced in a real-world vehicle. Prospective position of the car is estimated based on its current speed and heading direction by propagating the position of the car forward until the expected time when actuations are expected to have an effect. The NMPC trajectory is then determined by solving the control problem starting from that position.
 
+We use the following update equations:
+
+```
+      const int actuatorDelay =  100;
+      
+      // Actuator delay in seconds.
+      const double delay = actuatorDelay / 1000.0;
+      
+      // Initial state.
+      const double x0 = 0;
+      const double y0 = 0;
+      const double psi0 = 0;
+      const double cte0 = coeffs[0];
+      const double epsi0 = -atan(coeffs[1]);
+      
+      // State after delay.
+      double x_delay = x0 + ( v * cos(psi0) * delay );
+      double y_delay = y0 + ( v * sin(psi0) * delay );
+      double psi_delay = psi0 - ( v * delta * delay / mpc.Lf );
+      double v_delay = v + a * delay;
+      double cte_delay = cte0 + ( v * sin(epsi0) * delay );
+      double epsi_delay = epsi0 - ( v * atan(coeffs[1]) * delay / mpc.Lf );
+```
+
 ## Timestep Length and Frequency
 
 In the receeding horizon problem the cost function is minimized at each time step, but only the actuations corresponding to the first time step are sent to the simulator. At the next time step the entire optimal control problem is solved again.
