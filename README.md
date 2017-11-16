@@ -1,6 +1,53 @@
 # CarND-Controls-MPC
 Self-Driving Car Engineer Nanodegree Program
 
+The purpose of this project is to develop a nonlinear model predictive controller (NMPC) to steer a car around a track in a simulator. The simulator provides a feed of values containing the position of the car, its speed and heading direction. Additionally it provides the coordinates of waypoints along a reference trajectory that the car is to follow. All coordinates are provided in a global coordinate system.
+
+## Vehicle Model
+
+The vehicle model used in this project is a kinematic bicycle model. It neglects all dynamical effects such as inertia, friction and torque. The model takes changes of heading direction into account and is thus non-linear. The model used consists of the following equations
+
+```
+x_[t+1] = x[t] + v[t] * cos(psi[t]) * dt
+y_[t+1] = y[t] + v[t] * sin(psi[t]) * dt
+psi_[t+1] = psi[t] + v[t] / Lf * delta[t] * dt
+v_[t+1] = v[t] + a[t] * dt
+cte[t+1] = f(x[t]) - y[t] + v[t] * sin(epsi[t]) * dt
+epsi[t+1] = psi[t] - psides[t] + v[t] * delta[t] / Lf * dt
+```
+
+Here, `x,y` denote the position of the car, `psi` the heading direction, `v` its velocity `cte` the cross-track error and `epsi` the orientation error. `Lf` is the distance between the center of mass of the vehicle and the front wheels and affects the maneuverability. The vehicle model can be found in the class `FG_eval`.
+
+
+
+## Polynomial Fitting and MPC Preprocessing
+
+All computations are performed in the vehicle coordinate system. The coordinates of waypoints in vehicle coordinates are obtained by first shifting the origin to the current poistion of the vehicle and a subsequet 2D rotation to align the x-axis with the heading direction. Therby the waypoints are obtained in the frame of the vehicle. A third order polynomial is then fitted to the waypoints. The transformation between coordinate systems is implemented in transformGlobalToLocal. The transformation used is:
+
+```
+ X' =   cos(psi) * (ptsx[i] - x) + sin(psi) * (ptsy[i] - y);
+ Y' =  -sin(psi) * (ptsx[i] - x) + cos(psi) * (ptsy[i] - y);  
+ ```
+
+where `X',Y'` denote coordinates in the vehicle coordinate system. Note that the initial position of the car and heading direction are always zero in this frame. Thus the state of the car in the vehicle cordinate system is
+
+```
+state << 0, 0, 0, v, cte, epsi;
+```
+
+## Model Predictive Control with Latency
+
+For every state value provided by the simulator an optimal trajectory for the next N time steps is computed that minimizes a cost function. The cost function is quadratic in the cross-track error, the error in the heading direction, the difference to the reference velocity, the actuator values and the difference of actuator values in adjacent time steps. Parameter values are tuned so that they lead to smooth driving both for slow (25mph) and fast velocities (70mph). The control problem is restricted by the vehicle model as well as actuator max and min values. The cost function can be found in `FG_eval`.
+
+Before sending the result back to the simulator a 100ms latency delay was implemented. `this_thread::sleep_for(chrono::milliseconds(100)); `This replicated the actuation delay that would be experienced in a real-world vehicle. Prospective position of the car is estimated based on its current speed and heading direction by propagating the position of the car forward until the expected time when actuations are expected to have an effect. The NMPC trajectory is then determined by solving the control problem starting from that position.
+
+## Timestep Length and Frequency
+
+In the receeding horizon problem the cost function is minimized at each time step, but only the actuations corresponding to the first time step are sent to the simulator. At the next time step the entire optimal control problem is solved again.
+
+The MPC optimiser has two variables to represent the horizon into the future to predict actuator changes. They are determined by N (Number of timesteps) and dt (timestep duration) where T (time) = N * dt. To help tune these settings, I copied the mpc_to_line project quiz, to a new project mpc_to_waypoint, and modified it to represent the initial state model to be used with the Udacity simulator. I started with looking out 3 seconds, with N = 15 and dt = 0.2. However what I found, is that a horizon of 3 seconds in the simulator is too far. The faster the vehicle, optimizer was looking too far into time, which is useless. It started to fail and the vehicle would end up going off the track. Eventually, via trial and error, I found good results where N was 8 to 10 and dt between ~0.08 to ~0.105. I eventually settled on calculating dt based on Time/N (with time set at ~.65 seconds and N on 8).
+
+
 ---
 
 ## Dependencies
