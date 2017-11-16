@@ -91,6 +91,8 @@ int main() {
                     double py = j[1]["y"];
                     double psi = j[1]["psi"];
                     double v = j[1]["speed"];
+                    double delta= j[1]["steering_angle"];
+                    double a = j[1]["throttle"];
                     
                     // create Eigen vectors from standard vector
                     Eigen::VectorXd ptsxv = Eigen::VectorXd::Map(ptsx.data(), ptsx.size());
@@ -107,22 +109,30 @@ int main() {
                     // calculate in vehicle space ie car is 0,0
                     auto coeffs = polyfit(ptsxv, ptsyv, 3);
                     
-                    // calculate the cross track error
-                    double cte = -polyeval(coeffs, 0) ;
+                    const int actuatorDelay =  100;
                     
-                    // calculate the orientation error
-                    double epsi = -atan(coeffs[1]);
-                    cout << "cte " << cte <<" epsi " << epsi << endl;
+                    // Actuator delay in seconds.
+                    const double delay = actuatorDelay / 1000.0;
                     
-                    // create current state vector and solve
+                    // Initial state.
+                    const double x0 = 0;
+                    const double y0 = 0;
+                    const double psi0 = 0;
+                    const double cte0 = coeffs[0];
+                    const double epsi0 = -atan(coeffs[1]);
+                    
+                    // State after delay.
+                    double x_delay = x0 + ( v * cos(psi0) * delay );
+                    double y_delay = y0 + ( v * sin(psi0) * delay );
+                    double psi_delay = psi0 - ( v * delta * delay / mpc.Lf );
+                    double v_delay = v + a * delay;
+                    double cte_delay = cte0 + ( v * sin(epsi0) * delay );
+                    double epsi_delay = epsi0 - ( v * atan(coeffs[1]) * delay / mpc.Lf );
+                    
+                    // Define the state vector.
                     Eigen::VectorXd state(6);
-                    // vehicle center of world
-                    double vkph = v * 1.609344;
-                    double vx = 0 + vkph * 100 / (1000 * 60 * 60); // move forward the projected distance to cover 100 ms of latency
-                    double vy = 0;
-                    double vpsi = 0;
+                    state << x_delay, y_delay, psi_delay, v_delay, cte_delay, epsi_delay;
                     
-                    state << vx, vy, vpsi, v, cte, epsi;
                     std::vector<double> sol = mpc.Solve(state, coeffs);
                     
                     //for (auto i = sol.begin(); i != sol.end(); ++i)

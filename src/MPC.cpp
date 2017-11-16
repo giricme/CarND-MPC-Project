@@ -6,9 +6,9 @@
 using CppAD::AD;
 
 // Set the timestep length and duration
-double T = .65; // seconds
-size_t N = 8; // number of timesteps into the horizon
-double dt = T/N; // time interval
+const double T = .65; // seconds
+const size_t N = 8; // number of timesteps into the horizon
+const double dt = T/N; // time interval
 
 // This value assumes the model presented in the classroom is used.
 //
